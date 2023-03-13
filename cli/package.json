@@ -1,0 +1,39 @@
+{
+  "name": "htmlconverter",
+  "version": "1.0.0",
+  "description": "A simple CLI tool to convert HTML to PDF or PNG from a local file or a URL to a web page using Puppeteer (Chromium).",
+  "keywords": [
+    "puppeteer",
+    "chrome",
+    "cli",
+    "html",
+    "pdf",
+    "png",
+    "converter",
+    "generate"
+  ],
+  "homepage": "https://www.athenapdf.com/",
+  "bugs": {
+    "url": "https://github.com/daniesy/htmlconverter/issues"
+  },
+  "license": "MIT",
+  "author": "Dan Florian <hello@danutflorian.com>",
+  "main": "htmlconverter.js",
+  "bin": "./bin/htmlconverter",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/daniesy/htmlconverter.git"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start" : "node bin/htmlconverter"
+  },
+  "dependencies": {
+    "commander": "^10.0.0",
+    "puppeteer-core": "^19.7.4",
+    "rw": "^1.3.2"
+  },
+  "devDependencies": {
+    "puppeteer": "^19.7.4"
+  }
+}

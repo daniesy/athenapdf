@@ -1,0 +1,16 @@
+#!/usr/bin/env node
+
+const path = require("path");
+const { spawn } = require('child_process');
+
+const args = process.argv.slice(2);
+
+const src = path.resolve(path.join(__dirname, "/../src/main.js"));
+args.unshift(src);
+
+spawn("node", args, {
+    stdio: "inherit",
+    cwd: path.resolve(process.cwd())
+}).on('close', (code) => {
+    process.exit(code);
+});
