@@ -1,5 +1,6 @@
 FROM golang:1.20.1-alpine as builder
 MAINTAINER Dan Florian <hello@danutflorian.com>
+
 RUN apk add --update git
 
 RUN mkdir build
@@ -9,20 +10,26 @@ COPY . .
 RUN go get
 RUN CGO_ENABLED=0 go build -v -o /weaver .
 
-FROM daniesy/htmlconverter
+FROM daniesy/htmlconverter:latest
+USER root
+
 ENV GIN_MODE release
 
-RUN apk add dumb-init xvfb
+RUN apk add dumb-init
 
-COPY --from=builder /weaver /htmlconverter-service/
-WORKDIR /htmlconverter-service/
+RUN mkdir /service \
+     && chown -R noob:noob /service
 
-ENV PATH /htmlconverter-service/:$PATH
+ENV PATH /service/:$PATH
 
-COPY conf/ /htmlconverter-service/conf/
+COPY --from=builder /weaver /service
+COPY conf/ /service/conf/
+
+WORKDIR /service
+
+USER noob
 
 EXPOSE 8080
-
 CMD ["dumb-init", "weaver"]
 
-ENTRYPOINT ["/htmlconverter-service/conf/entrypoint.sh"]
+ENTRYPOINT ["/service/conf/entrypoint.sh"]
