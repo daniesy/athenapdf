@@ -22,6 +22,7 @@ const addHeader = (header, arr) => {
 program
     .version("1.0.0")
     .description("convert HTML to PDF or PNG via stdin or a local / remote URI")
+    .option("-V, --verbose", "enable verbose", false)
     .option("--pdf", "convert to pdf", false)
     .option("--png", "convert to png", false)
     .option("-T, --timeout <seconds>", "seconds before timing out (default: 120)", parseInt)
@@ -38,7 +39,7 @@ program
     .option("--no-background", "omit CSS backgrounds")
     .option("--transparent", "hides default white background and allows generating pdfs with transparency.", false)
     .option("--no-cache", "disables caching")
-    .option("--ignore-certificate-errors", "ignores certificate errors", false)
+    .option("--ignore-certificate-errors", "ignores certificate errors", true)
     .option("--ignore-gpu-blacklist", "Enables GPU in Docker environment")
     .option("--wait-for-status", "Wait until window.status === WINDOW_STATUS (default: wait for page to load)", false)
     .arguments("<URI> [output]")
@@ -92,55 +93,41 @@ if (!options.cache) {
 const puppeteerHeaders = extraHeaders.reduce((c, i) => {
     const [key, value] = i.split(":");
     c[key.trim()] = value.trim();
-    return puppeteerHeaders;
+    return c;
 }, {});
-
-const minimal_args = [
-    '--autoplay-policy=user-gesture-required',
-    '--disable-background-networking',
-    '--disable-background-timer-throttling',
-    '--disable-backgrounding-occluded-windows',
-    '--disable-breakpad',
-    '--disable-client-side-phishing-detection',
-    '--disable-component-update',
-    '--disable-default-apps',
-    '--disable-dev-shm-usage',
-    '--disable-domain-reliability',
-    '--disable-extensions',
-    '--disable-features=AudioServiceOutOfProcess',
-    '--disable-hang-monitor',
-    '--disable-ipc-flooding-protection',
-    '--disable-notifications',
-    '--disable-offer-store-unmasked-wallet-cards',
-    '--disable-popup-blocking',
-    '--disable-print-preview',
-    '--disable-prompt-on-repost',
-    '--disable-renderer-backgrounding',
-    '--disable-setuid-sandbox',
-    '--disable-speech-api',
-    '--disable-sync',
-    '--hide-scrollbars',
-    '--ignore-gpu-blacklist',
-    '--metrics-recording-only',
-    '--mute-audio',
-    '--no-default-browser-check',
-    '--no-first-run',
-    '--no-pings',
-    '--no-sandbox',
-    '--no-zygote',
-    '--password-store=basic',
-    '--use-gl=swiftshader',
-    '--use-mock-keychain',
-];
 
 const args = () => {
     let o = {
         "headless": true,
+        'dumpio': options.verbose,
         "args": [
-            '--no-sandbox',
             '--headless',
+            '--no-sandbox',
+            '--disable-web-security',
+            '--disable-features=IsolateOrigins',
+            '--disable-site-isolation-trials',
+            '--disable-features=BlockInsecurePrivateNetworkRequests',
+            '--no-zygote',
+            '--safebrowsing-disable-auto-update',
+            '--run-all-compositor-stages-before-draw',
+            '--disable-translate',
+            '--disable-extensions',
+            '--disable-background-networking',
+            '--disable-background-timer-throttling',
+            '--disable-client-side-phishing-detection',
+            '--disable-sync',
+            '--disable-default-apps',
+            '--disable-browser-side-navigation',
+            '--disable-hang-monitor',
+            '--disable-prompt-on-repost',
+            '--no-first-run',
+            '--mute-audio',
+            '--hide-scrollbars',
             '--disable-dev-shm-usage',
-            ...minimal_args
+            '--disable-setuid-sandbox',
+            '--disable-accelerated-2d-canvas',
+            '-devtools-flags=disable',
+            '--single-process', // <- this one doesn't works in Windows
         ]
     };
 
@@ -162,9 +149,7 @@ const args = () => {
         o.args.push("--disable-gpu");
     }
 
-    if (options.ignoreCertificateErrors) {
-        o.ignoreHTTPSErrors = true;
-    }
+    o.ignoreHTTPSErrors = options.ignoreCertificateErrors;
 
     return o;
 }
@@ -181,7 +166,8 @@ const pdfOptions = {
     printBackground: !options.background,
     omitBackground: options.transparent,
     landscape: !options.portrait,
-    timeout: options.waitForStatus ? 0 : options.timeout * 100,
+    preferCSSPageSize: true,
+    timeout: options.waitForStatus ? 0 : options.timeout * 1000,
 };
 
 const pngOptions = {
@@ -198,11 +184,17 @@ const pngOptions = {
     const page = await browser.newPage();
 
     await page.setExtraHTTPHeaders(puppeteerHeaders);
-    await page.goto(uriArg);
+
+    const result = await page.goto(uriArg);
+    if (result.status() !== 200) {
+        console.log('Error loading page:', result.status());
+        await browser.close();
+        process.exit(3);
+    }
 
     // Load plugins
     const mediaPlugin = fs.readFileSync(path.join(__dirname, "./plugin_media.js"), "utf8");
-    let plugins = mediaPlugin + "\n";
+    let plugins = "";
 
     if (options.aggressive) {
         const distillerPlugin = fs.readFileSync(path.join(__dirname, "./plugin_domdistiller.js"), "utf8");
@@ -214,6 +206,7 @@ const pngOptions = {
     }
 
     await page.evaluate(plugins);
+
     if (options.waitForStatus) {
         const data = await print(page);
         await output(data);
@@ -226,8 +219,8 @@ const pngOptions = {
     await browser.close();
 })();
 
-const wait = timeout => new Promise(resolve => {
-    setTimeout(resolve, timeout);
+const wait = seconds => new Promise(resolve => {
+    setTimeout(resolve, seconds * 1000);
 });
 
 const print = page =>

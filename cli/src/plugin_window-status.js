@@ -1,10 +1,11 @@
 var waitForWindowStatus = function(desiredStatus) {
     return new Promise(function(resolve) {
         var poller = setInterval(function() {
-            if (window.status && window.status == desiredStatus) {
+            if (window.status && window.status === desiredStatus) {
                 clearInterval(poller);
                 resolve(desiredStatus);
             }
+            console.log("nope");
         }, 100);
     });
 };
