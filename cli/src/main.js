@@ -101,7 +101,7 @@ const args = () => {
         "headless": true,
         'dumpio': options.verbose,
         "args": [
-            '--headless',
+            '--headless=new',
             '--no-sandbox',
             '--disable-web-security',
             '--disable-features=IsolateOrigins',
