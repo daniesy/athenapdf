@@ -183,6 +183,7 @@ const pngOptions = {
     const browser = await puppeteer.launch(args());
     const page = await browser.newPage();
 
+    await page.setDefaultNavigationTimeout(0);
     await page.setExtraHTTPHeaders(puppeteerHeaders);
 
     const result = await page.goto(uriArg);
