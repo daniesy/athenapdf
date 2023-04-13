@@ -64,7 +64,7 @@ if (!uriArg) {
 
 // Handle stdin
 if (uriArg === "-") {
-    let base64Html = new Buffer(rw.readFileSync("/dev/stdin", "utf8"), "utf8").toString("base64");
+    let base64Html = Buffer.from(rw.readFileSync("/dev/stdin", "utf8"), "utf8").toString("base64");
     uriArg = "data:text/html;base64," + base64Html;
 // Handle local paths
 } else if (!uriArg.toLowerCase().startsWith("http") && !uriArg.toLowerCase().startsWith("chrome://")) {
