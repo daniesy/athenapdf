@@ -50,7 +50,7 @@ type TestConversionUpload struct {
 	Conversion
 }
 
-func (c TestConversionUpload) Upload(b []byte) (bool, error) {
+func (c TestConversionUpload) Upload(t string, b []byte) (bool, error) {
 	return true, nil
 }
 

@@ -12,16 +12,17 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"weaver/pkg/config"
 	"weaver/pkg/converter"
 )
 
 func TestConfigMiddleware(t *testing.T) {
 	r := gin.Default()
-	mockConf := Config{MaxWorkers: 17}
-	var ctxConf Config
+	mockConf := config.Config{MaxWorkers: 17}
+	var ctxConf config.Config
 	r.Use(ConfigMiddleware(mockConf))
 	r.GET("/", func(c *gin.Context) {
-		ctxConf = c.MustGet("config").(Config)
+		ctxConf = c.MustGet("config").(config.Config)
 	})
 	res := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", "/", nil)
@@ -112,7 +113,7 @@ func TestErrorMiddleware(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unable to read response body: %+v", err)
 	}
-	want := "{\"error\":\"PDF conversion failed due to an internal server error\"}"
+	want := "{\"error\":\"conversion failed due to an internal server error\"}"
 	if !reflect.DeepEqual(strings.TrimSpace(string(got)), want) {
 		t.Errorf("expected response body to be %s, got %s", want, got)
 	}

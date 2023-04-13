@@ -10,16 +10,16 @@ import (
 )
 
 func TestConstructCMD(t *testing.T) {
-	got := constructCMD("athenapdf -S -T 120", "test_file.html", false, false)
-	want := []string{"athenapdf", "-S", "-T", "120", "test_file.html"}
+	got := constructCMD("athenapdf -S -T 120", "test_file.html", "pdf", false, false)
+	want := []string{"athenapdf", "-S", "-T", "120", "test_file.html", "--pdf"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("expected constructed athenapdf command to be %+v, got %+v", want, got)
 	}
 }
 
 func TestConstructCMD_aggressive(t *testing.T) {
-	cmd := constructCMD("athenapdf -S -T 60", "test_file.html", true, false)
-	if got, want := cmd[len(cmd)-1], "-A"; got != want {
+	cmd := constructCMD("athenapdf -S -T 60", "test_file.html", "pdf", true, false)
+	if got, want := cmd[len(cmd)-2], "-A"; got != want {
 		t.Errorf("expected last argument of constructed athenapdf command to be %s, got %+v", want, got)
 	}
 }
@@ -41,7 +41,7 @@ func TestConvert(t *testing.T) {
 	if err != nil {
 		t.Fatalf("convert returned an unexpected error: %+v", err)
 	}
-	if want := []byte(ts.URL + "\n"); !reflect.DeepEqual(got, want) {
+	if want := []byte(ts.URL + " --png\n"); !reflect.DeepEqual(got, want) {
 		t.Errorf("expected output of athenapdf conversion to be %s, got %s", want, got)
 	}
 }
@@ -59,7 +59,7 @@ func TestConvert_local(t *testing.T) {
 	if err != nil {
 		t.Fatalf("convert returned an unexpected error: %+v", err)
 	}
-	if want := []byte(p + "\n"); !reflect.DeepEqual(got, want) {
+	if want := []byte(p + " --png\n"); !reflect.DeepEqual(got, want) {
 		t.Errorf("expected output of athenapdf conversion to be %s, got %s", want, got)
 	}
 }

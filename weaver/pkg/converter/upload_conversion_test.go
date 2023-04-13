@@ -5,7 +5,7 @@ import (
 )
 
 func expectUploadToHalt(t *testing.T, mockConversion UploadConversion) {
-	got, err := mockConversion.Upload([]byte{})
+	got, err := mockConversion.Upload("pdf", []byte{})
 	if err != nil {
 		t.Fatalf("upload returned an unexpected error: %+v", err)
 	}
