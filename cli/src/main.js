@@ -99,7 +99,9 @@ const puppeteerHeaders = extraHeaders.reduce((c, i) => {
 const args = () => {
     let o = {
         "headless": true,
-        'dumpio': options.verbose,
+        "dumpio": options.verbose,
+        "protocolTimeout": 0,
+        "timeout": 0,
         "args": [
             '--headless=new',
             '--no-sandbox',
