@@ -1,4 +1,7 @@
-# Athena
+**The original AthenaPDF repo is deprecated.**
+**I've cloned the repo, adapted and updated it with new features and dependencies.**
+
+# HtmlConverted
 
 [![Build Status](https://travis-ci.org/arachnys/athenapdf.svg?branch=master)](https://travis-ci.org/arachnys/athenapdf)
 [![License](http://img.shields.io/badge/license-MIT-orange.svg?style=flat)](http://opensource.org/licenses/MIT)
@@ -6,9 +9,9 @@
 
 Simple, Docker-powered PDF conversions.
 
-Athena is comprised of an [Electron][electron] command line interface (CLI) tool, and a [Go][go] microservice for converting HTML to PDF documents.
+HTMLConverter is comprised of an [Electron][electron] command line interface (CLI) tool, and a [Go][go] microservice for converting HTML to PDF documents.
 
-> Athena transformed Arachne into a spider for challenging her as a weaver and/or weaving a tapestry that insulted the gods.
+> HTMLConverter transformed Arachne into a spider for challenging her as a weaver and/or weaving a tapestry that insulted the gods.
 
 **Examples:**
 
@@ -20,7 +23,7 @@ _When [aggressive mode][aggressive] is enabled, only the essential contents of a
 
 ## Background
 
-Athena is an open source project.
+HtmlConverted is an open source project.
 
 It was designed to [do one thing and to do it well][unixphil] - PDF conversions; to work together with other programs; and to be able to handle text streams, because that is a universal interface.
 
@@ -30,7 +33,7 @@ At the lowest level, its [CLI][cli] component ([`htmlconverter`][cli]) was desig
 
 (For what it's worth, wkhtmltopdf is great, but it has a horrible habit of crashing unexpectedly - especially when printing documents with invalid HTML, problematic CSS or other issues).
 
-There is also a [microservice][weaver] component ([`weaver`][weaver]), allowing you to leverage Athena over HTTP.
+There is also a [microservice][weaver] component ([`weaver`][weaver]), allowing you to leverage HtmlConverted over HTTP.
 
 ## Getting Started
 
@@ -102,28 +105,3 @@ See [`LICENSE`](LICENSE).
 
 ---
 
-![Arachnys](https://s3-eu-west-1.amazonaws.com/athena-pdf-public/examples/logo.png)
-
-An [Arachnys][arachnys] Christmas project.
-
-
-[htmlconverter]: http://www.athenapdf.com/
-[unixphil]: https://en.wikipedia.org/wiki/Unix_philosophy
-[example-1]: https://www.arachnys.com/the-long-road-to-achieving-true-perpetual-kyc/?utm_campaign=athena&utm_medium=external%20website&utm_source=github&utm_content=readme
-[example-1-pdf]: https://s3-eu-west-1.amazonaws.com/athena-pdf-public/examples/d0ae9e636bb7edceac48bd9b0780ad9dd69397cc.pdf
-[example-1-aggressive]: https://s3-eu-west-1.amazonaws.com/athena-pdf-public/examples/d0ae9e636bb7edceac48bd9b0780ad9dd69397cc-aggressive.pdf
-[example-2]: https://panamapapers.icij.org/20160403-mossack-fonseca-offshore-secrets.html
-[example-2-pdf]: https://s3-eu-west-1.amazonaws.com/athena-pdf-public/examples/f86e19ea13661e47c1f5f83bbde650eb3fe85aad.pdf
-[example-2-aggressive]: https://s3-eu-west-1.amazonaws.com/athena-pdf-public/examples/f86e19ea13661e47c1f5f83bbde650eb3fe85aad-aggressive.pdf
-[aggressive]: cli/docs/aggressive.md
-[electron]: https://www.electronjs.org/
-[go]: https://golang.org/
-[cli]: cli/
-[weaver]: weaver/
-[wkhtmltopdf]: http://wkhtmltopdf.org/
-[cloudconvert]: https://cloudconvert.com/
-[docker]: https://www.docker.com/
-[docker-machine]: https://docs.docker.com/mac/step_one/
-[headless]: http://internetofthingsagenda.techtarget.com/definition/headless-system
-[arachnys]: https://www.arachnys.com/?utm_campaign=athena&utm_medium=external%20website&utm_source=github&utm_content=readme
-[ecs]: https://aws.amazon.com/ecs/details/
