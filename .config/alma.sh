@@ -51,3 +51,8 @@ supervisorctl reread
 supervisorctl update
 supervisorctl start all
 supervisorctl tail -f weaver
+
+#export PATH="/app/cli/bin:$PATH"
+#export WEAVER_HTTPS_ADDR=api.htmlconverter.cloud:443
+#export WEAVER_TLS_CERT_FILE=/etc/letsencrypt/live/api.htmlconverter.cloud/fullchain.pem
+#export WEAVER_TLS_KEY_FILE=/etc/letsencrypt/live/api.htmlconverter.cloud/privkey.pem
