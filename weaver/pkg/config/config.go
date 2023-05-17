@@ -80,7 +80,7 @@ func NewEnvConfig() Config {
 		CliCMD:             "htmlconverter -S",
 		MaxWorkers:         10,
 		MaxConversionQueue: 50,
-		WorkerTimeout:      90,
+		WorkerTimeout:      1000,
 		ConversionFallback: false,
 	}
 
