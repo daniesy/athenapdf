@@ -128,8 +128,7 @@ const args = () => {
             '--disable-dev-shm-usage',
             '--disable-setuid-sandbox',
             '--disable-accelerated-2d-canvas',
-            '-devtools-flags=disable',
-            '--single-process', // <- this one doesn't works in Windows
+            '--devtools-flags=disable'
         ]
     };
 
@@ -185,7 +184,7 @@ const pngOptions = {
     const browser = await puppeteer.launch(args());
     const page = await browser.newPage();
 
-    await page.setDefaultNavigationTimeout(0);
+    await page.setDefaultNavigationTimeout(options.timeout * 1000);
     await page.setExtraHTTPHeaders(puppeteerHeaders);
 
     const result = await page.goto(uriArg);
