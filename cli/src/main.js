@@ -3,6 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const rw = require("rw");
 const url = require("url");
+process.env.CHROME_BIN="/usr/bin/chromium-browser";
 const puppeteer =  process.env.CHROME_BIN ? require("puppeteer-core") : require("puppeteer");
 
 const {program} = require("commander");
@@ -22,7 +23,7 @@ const addHeader = (header, arr) => {
 program
     .version("1.0.0")
     .description("convert HTML to PDF or PNG via stdin or a local / remote URI")
-    .option("-V, --verbose", "enable verbose", false)
+    .option("-L, --log", "enable verbose", false)
     .option("--pdf", "convert to pdf", false)
     .option("--png", "convert to png", false)
     .option("-T, --timeout <seconds>", "seconds before timing out (default: 120)", parseInt)
@@ -106,6 +107,16 @@ const args = () => {
             '--headless=new',
             '--no-sandbox',
             '--disable-web-security',
+	'--disable-setuid-sandbox',
+      '--disable-dev-shm-usage', // Avoid issues with shared memory.
+      '--disable-background-timer-throttling', // Prevent throttling of timers in background tabs.
+      '--disable-renderer-backgrounding', // Keep the renderer processes alive when not in the foreground.
+      '--disable-backgrounding-occluded-windows', // Disable backgrounding of windows occluded by other windows.
+      '--disable-breakpad', // Disable crash reporting.
+      '--disable-features=TranslateUI', // Disable built-in translate.
+      '--disable-sync', // Disable browser sign-in and sync features.
+      '--disable-extensions', // Disable extensions that could slow down processing.
+      '--disable-default-apps', // Disable default apps.
             '--disable-features=IsolateOrigins',
             '--disable-site-isolation-trials',
             '--disable-features=BlockInsecurePrivateNetworkRequests',
