@@ -61,12 +61,15 @@ func (w Work) Process(t int) {
 	werr := make(chan error, 1)
 
 	go func(w Work, done <-chan struct{}, wout chan<- []byte, werr chan<- error) {
+		log.Printf("[Worker] rendering conversion: %s\n", w.source.GetActualURI())
 		out, err := w.converter.Convert(w.source, done)
 		if err != nil {
 			werr <- err
 			return
 		}
+		log.Printf("[Worker] rendered conversion: %d bytes\n", len(out))
 
+		log.Printf("[Worker] starting upload phase\n")
 		uploaded, err := w.converter.Upload(w.source.ContentType(), out)
 		if err != nil {
 			werr <- err
@@ -74,10 +77,12 @@ func (w Work) Process(t int) {
 		}
 
 		if uploaded {
+			log.Printf("[Worker] upload phase completed\n")
 			close(w.uploaded)
 			return
 		}
 
+		log.Printf("[Worker] no upload configured; returning conversion inline\n")
 		wout <- out
 	}(w, done, wout, werr)
 

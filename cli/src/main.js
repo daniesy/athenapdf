@@ -1,15 +1,33 @@
 const crypto = require("crypto");
 const fs = require("fs");
+const os = require("os");
 const path = require("path");
 const rw = require("rw");
 const url = require("url");
 
-const defaultChromeBin = "/usr/bin/chromium-browser";
-if (!process.env.CHROME_BIN && fs.existsSync(defaultChromeBin)) {
-    process.env.CHROME_BIN = defaultChromeBin;
+const defaultChromeBins = [
+    "/usr/bin/chromium-browser",
+    "/usr/bin/chromium",
+    "/usr/bin/google-chrome",
+];
+if (!process.env.CHROME_BIN) {
+    const detectedChromeBin = defaultChromeBins.find(chromeBin => fs.existsSync(chromeBin));
+    if (detectedChromeBin) {
+        process.env.CHROME_BIN = detectedChromeBin;
+    }
 }
 
-const puppeteer = require("puppeteer");
+const puppeteer = (() => {
+    if (process.env.CHROME_BIN) {
+        try {
+            return require("puppeteer-core");
+        } catch (err) {
+            // Fall back to full Puppeteer when puppeteer-core is not installed directly.
+        }
+    }
+
+    return require("puppeteer");
+})();
 
 const {program} = require("commander");
 
@@ -30,6 +48,13 @@ const parsePositiveInteger = value => {
     const intValue = parseInteger(value);
     if (!Number.isInteger(intValue) || intValue <= 0) {
         throw new Error("Value must be a positive integer");
+    }
+    return intValue;
+};
+const parseNonNegativeInteger = value => {
+    const intValue = parseInteger(value);
+    if (!Number.isInteger(intValue) || intValue < 0) {
+        throw new Error("Value must be a non-negative integer");
     }
     return intValue;
 };
@@ -76,7 +101,7 @@ program
     .option("--viewport-width <pixels>", "browser viewport width before printing (default: 800)", parsePositiveInteger, 800)
     .option("--viewport-height <pixels>", "browser viewport height before printing (default: 600)", parsePositiveInteger, 600)
     .option("--device-scale-factor <factor>", "raster/canvas render quality multiplier (default: 2)", parseDeviceScaleFactor, 2)
-    .option("--pdf-render-mode <mode>", "PDF rendering mode: auto, raster for exact browser appearance, or vector for selectable text (default: auto)", parsePdfRenderMode, "auto")
+    .option("--pdf-render-mode <mode>", "PDF rendering mode: vector for links/selectable text, raster for exact browser appearance, or auto (default: vector)", parsePdfRenderMode, "vector")
     .option("--shadow-mode <mode>", "PDF shadow handling: native, safe, flat, or none (default: native)", parseShadowMode, "native")
     .option("-S, --stdout", "write conversion to stdout")
     .option("-A, --aggressive", "aggressive mode / runs dom-distiller")
@@ -90,6 +115,7 @@ program
     .option("--ignore-certificate-errors", "ignores certificate errors", true)
     .option("--ignore-gpu-blacklist", "Enables GPU in Docker environment")
     .option("--wait-for-status", "Wait until window.status === WINDOW_STATUS (default: wait for page to load)", false)
+    .option("--status-timeout <seconds>", "seconds before timing out while waiting for window.status; 0 disables this limit (default: 300)", parseNonNegativeInteger, 300)
     .arguments("<URI> [output]")
     .action((uri, output) => {
         uriArg = uri;
@@ -158,16 +184,17 @@ const args = () => {
             '--headless=new',
             '--no-sandbox',
             '--disable-web-security',
-	'--disable-setuid-sandbox',
-      '--disable-dev-shm-usage', // Avoid issues with shared memory.
-      '--disable-background-timer-throttling', // Prevent throttling of timers in background tabs.
-      '--disable-renderer-backgrounding', // Keep the renderer processes alive when not in the foreground.
-      '--disable-backgrounding-occluded-windows', // Disable backgrounding of windows occluded by other windows.
-      '--disable-breakpad', // Disable crash reporting.
-      '--disable-features=TranslateUI', // Disable built-in translate.
-      '--disable-sync', // Disable browser sign-in and sync features.
-      '--disable-extensions', // Disable extensions that could slow down processing.
-      '--disable-default-apps', // Disable default apps.
+            '--allow-file-access-from-files',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage', // Avoid issues with shared memory.
+            '--disable-background-timer-throttling', // Prevent throttling of timers in background tabs.
+            '--disable-renderer-backgrounding', // Keep the renderer processes alive when not in the foreground.
+            '--disable-backgrounding-occluded-windows', // Disable backgrounding of windows occluded by other windows.
+            '--disable-breakpad', // Disable crash reporting.
+            '--disable-features=TranslateUI', // Disable built-in translate.
+            '--disable-sync', // Disable browser sign-in and sync features.
+            '--disable-extensions', // Disable extensions that could slow down processing.
+            '--disable-default-apps', // Disable default apps.
             '--disable-features=IsolateOrigins',
             '--disable-site-isolation-trials',
             '--disable-features=BlockInsecurePrivateNetworkRequests',
@@ -244,6 +271,15 @@ const pngOptions = {
 
 const renderDelayMs = hasDelayOption ? options.delay : (hasTimeoutOption ? options.timeout * 1000 : options.delay);
 
+const logProgress = message => {
+    if (options.stdout) {
+        console.error(message);
+        return;
+    }
+
+    console.info(message);
+};
+
 (async () => {
     if (!options.stdout) {
         console.time(`${conversionType.toUpperCase()} Conversion`);
@@ -270,8 +306,7 @@ const renderDelayMs = hasDelayOption ? options.delay : (hasTimeoutOption ? optio
         }
 
         // Load plugins
-        const mediaPlugin = fs.readFileSync(path.join(__dirname, "./plugin_media.js"), "utf8");
-        let plugins = mediaPlugin + "\n";
+        let plugins = "";
 
         if (options.aggressive) {
             const distillerPlugin = fs.readFileSync(path.join(__dirname, "./plugin_domdistiller.js"), "utf8");
@@ -282,7 +317,7 @@ const renderDelayMs = hasDelayOption ? options.delay : (hasTimeoutOption ? optio
             plugins += windowStatusPlugin + "\n";
         }
 
-        await page.evaluate(plugins);
+        await evaluatePlugins(page, plugins);
         await applyPrintQuality(page);
         await waitForRenderReady(page);
 
@@ -304,6 +339,34 @@ const renderDelayMs = hasDelayOption ? options.delay : (hasTimeoutOption ? optio
 const wait = milliseconds => new Promise(resolve => {
     setTimeout(resolve, milliseconds);
 });
+
+const timeoutError = message => {
+    const err = new Error(message);
+    err.exitCode = 4;
+    return err;
+};
+
+const evaluatePlugins = async (page, plugins) => {
+    if (!options.waitForStatus) {
+        return page.evaluate(plugins);
+    }
+
+    const statusWait = page.evaluate(plugins);
+    if (options.statusTimeout > 0) {
+        const timeoutMs = Math.max(options.statusTimeout * 1000, 1000);
+        logProgress(`[CLI] waiting up to ${options.statusTimeout}s for window.status === "ready"`);
+        await Promise.race([
+            statusWait,
+            wait(timeoutMs).then(() => {
+                throw timeoutError(`Timed out after ${options.statusTimeout}s waiting for window.status === "ready"`);
+            }),
+        ]);
+    } else {
+        logProgress(`[CLI] waiting for window.status === "ready"`);
+        await statusWait;
+    }
+    logProgress(`[CLI] window.status is ready`);
+};
 
 const waitForRenderReady = async page => {
     const timeoutMs = Math.max(options.timeout * 1000, 0);
@@ -433,10 +496,12 @@ const print = page =>
 
 const printPDF = async page => {
     if (options.pdfRenderMode === "vector") {
+        logProgress("[CLI] rendering vector PDF");
         return page.pdf(pdfOptions);
     }
 
     const pagedPageCount = await getPagedPageCount(page);
+    logProgress(`[CLI] rendering PDF in ${options.pdfRenderMode} mode with ${pagedPageCount} Paged.js page(s)`);
 
     if (options.pdfRenderMode === "auto") {
         if (pagedPageCount === 0) {
@@ -481,7 +546,15 @@ const waitForRenderablePagedPages = async page => {
                     return true;
                 }
 
-                return Boolean(pageElement.querySelector("img, svg, canvas, table, video, picture, [style*='background']"));
+                if (pageElement.children.length > 0) {
+                    return true;
+                }
+
+                const style = window.getComputedStyle(pageElement);
+                return style.backgroundImage !== "none" ||
+                    style.backgroundColor !== "rgba(0, 0, 0, 0)" ||
+                    style.borderTopWidth !== "0px" ||
+                    style.boxShadow !== "none";
             });
         }, {timeout: timeoutMs, polling: 100});
         return true;
@@ -493,61 +566,70 @@ const waitForRenderablePagedPages = async page => {
 const rasterPDF = async page => {
     const pages = await captureRasterPages(page);
     const first = pages[0];
-    const html = `
-        <!doctype html>
-        <html>
-            <head>
-                <style>
-                    @page {
-                        size: ${first.width}px ${first.height}px;
-                        margin: 0;
-                    }
-                    html,
-                    body {
-                        margin: 0;
-                        padding: 0;
-                        background: ${options.transparent ? "transparent" : "white"};
-                    }
-                    .athenapdf-raster-page {
-                        width: ${first.width}px;
-                        height: ${first.height}px;
-                        margin: 0;
-                        padding: 0;
-                        page-break-after: always;
-                        break-after: page;
-                        overflow: hidden;
-                    }
-                    .athenapdf-raster-page:last-child {
-                        page-break-after: auto;
-                        break-after: auto;
-                    }
-                    .athenapdf-raster-page img {
-                        display: block;
-                        width: 100%;
-                        height: 100%;
-                    }
-                </style>
-            </head>
-            <body>
-                ${pages.map(pageImage => `
-                    <div class="athenapdf-raster-page">
-                        <img src="data:image/png;base64,${pageImage.base64}" alt="">
-                    </div>
-                `).join("")}
-            </body>
-        </html>
-    `;
+    logProgress(`[CLI] captured ${pages.length} raster page(s)`);
 
-    await page.setContent(html, {waitUntil: "load"});
-    return page.pdf({
-        width: `${first.width}px`,
-        height: `${first.height}px`,
-        margin: {"bottom": 0, "left": 0, "right": 0, "top": 0},
-        printBackground: true,
-        omitBackground: options.transparent,
-        preferCSSPageSize: true,
-        timeout: options.waitForStatus ? 0 : options.timeout * 1000,
-    });
+    try {
+        const html = `
+            <!doctype html>
+            <html>
+                <head>
+                    <style>
+                        @page {
+                            size: ${first.width}px ${first.height}px;
+                            margin: 0;
+                        }
+                        html,
+                        body {
+                            margin: 0;
+                            padding: 0;
+                            background: ${options.transparent ? "transparent" : "white"};
+                        }
+                        .athenapdf-raster-page {
+                            width: ${first.width}px;
+                            height: ${first.height}px;
+                            margin: 0;
+                            padding: 0;
+                            page-break-after: always;
+                            break-after: page;
+                            overflow: hidden;
+                        }
+                        .athenapdf-raster-page:last-child {
+                            page-break-after: auto;
+                            break-after: auto;
+                        }
+                        .athenapdf-raster-page img {
+                            display: block;
+                            width: 100%;
+                            height: 100%;
+                        }
+                    </style>
+                </head>
+                <body>
+                    ${pages.map(pageImage => `
+                        <div class="athenapdf-raster-page">
+                            <img src="${pageImage.src}" alt="">
+                        </div>
+                    `).join("")}
+                </body>
+            </html>
+        `;
+
+        const wrapperPath = path.join(createRasterAssetDir(), "index.html");
+        fs.writeFileSync(wrapperPath, html);
+        await page.goto(url.pathToFileURL(wrapperPath).href, {waitUntil: "load"});
+        await waitForRasterImages(page);
+        return page.pdf({
+            width: `${first.width}px`,
+            height: `${first.height}px`,
+            margin: {"bottom": 0, "left": 0, "right": 0, "top": 0},
+            printBackground: true,
+            omitBackground: options.transparent,
+            preferCSSPageSize: true,
+            timeout: options.waitForStatus ? 0 : options.timeout * 1000,
+        });
+    } finally {
+        cleanupRasterPages(pages);
+    }
 };
 
 const captureRasterPages = async page => {
@@ -585,14 +667,66 @@ const captureRasterPages = async page => {
             });
         }
 
-        pages.push({
-            base64: image.toString("base64"),
-            width: Math.ceil(bounds.width),
-            height: Math.ceil(bounds.height),
-        });
+        if (!bounds || bounds.width <= 0 || bounds.height <= 0) {
+            continue;
+        }
+
+        pages.push(createRasterPage(image, bounds, pages.length));
+    }
+
+    if (pages.length === 0) {
+        throw new Error("No renderable pages found for raster PDF output");
     }
 
     return pages;
+};
+
+const createRasterPage = (image, bounds, index) => {
+    const dir = createRasterAssetDir();
+    const filePath = path.join(dir, `page-${index + 1}.png`);
+    fs.writeFileSync(filePath, image);
+
+    return {
+        dir,
+        path: filePath,
+        src: url.pathToFileURL(filePath).href,
+        width: Math.ceil(bounds.width),
+        height: Math.ceil(bounds.height),
+    };
+};
+
+let rasterAssetDir = null;
+const createRasterAssetDir = () => {
+    if (!rasterAssetDir) {
+        rasterAssetDir = fs.mkdtempSync(path.join(os.tmpdir(), "athenapdf-raster-"));
+    }
+
+    return rasterAssetDir;
+};
+
+const cleanupRasterPages = pages => {
+    const dirs = new Set(pages.map(pageImage => pageImage.dir).filter(Boolean));
+    for (const dir of dirs) {
+        fs.rmSync(dir, {recursive: true, force: true});
+    }
+};
+
+const waitForRasterImages = page => {
+    return page.evaluate(async () => {
+        await Promise.all(Array.from(document.images).map(img => {
+            if (img.complete) {
+                if (img.naturalWidth > 0 && img.decode) {
+                    return img.decode().catch(() => {});
+                }
+                return Promise.resolve();
+            }
+
+            return new Promise(resolve => {
+                img.addEventListener("load", resolve, {once: true});
+                img.addEventListener("error", resolve, {once: true});
+            });
+        }));
+    });
 };
 
 const output = data => new Promise((resolve, reject) => {
