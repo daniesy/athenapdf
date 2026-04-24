@@ -436,15 +436,58 @@ const printPDF = async page => {
         return page.pdf(pdfOptions);
     }
 
-    if (options.pdfRenderMode === "auto" && !(await hasPagedPages(page))) {
-        return page.pdf(pdfOptions);
+    const pagedPageCount = await getPagedPageCount(page);
+
+    if (options.pdfRenderMode === "auto") {
+        if (pagedPageCount === 0) {
+            return page.pdf(pdfOptions);
+        }
+
+        const hasRenderablePagedPages = await waitForRenderablePagedPages(page);
+        if (!hasRenderablePagedPages) {
+            return page.pdf(pdfOptions);
+        }
+    } else if (pagedPageCount > 0) {
+        const hasRenderablePagedPages = await waitForRenderablePagedPages(page);
+        if (!hasRenderablePagedPages) {
+            return page.pdf(pdfOptions);
+        }
     }
 
     return rasterPDF(page);
 };
 
-const hasPagedPages = async page => {
-    return page.evaluate(() => document.querySelectorAll(".pagedjs_page").length > 0);
+const getPagedPageCount = page => {
+    return page.evaluate(() => document.querySelectorAll(".pagedjs_page").length);
+};
+
+const waitForRenderablePagedPages = async page => {
+    const timeoutMs = Math.min(Math.max(options.timeout * 1000, 1000), 10000);
+
+    try {
+        await page.waitForFunction(() => {
+            const pages = Array.from(document.querySelectorAll(".pagedjs_page"));
+            if (pages.length === 0) {
+                return false;
+            }
+
+            return pages.some(pageElement => {
+                const rect = pageElement.getBoundingClientRect();
+                if (!rect.width || !rect.height) {
+                    return false;
+                }
+
+                if (pageElement.textContent && pageElement.textContent.trim().length > 0) {
+                    return true;
+                }
+
+                return Boolean(pageElement.querySelector("img, svg, canvas, table, video, picture, [style*='background']"));
+            });
+        }, {timeout: timeoutMs, polling: 100});
+        return true;
+    } catch (err) {
+        return false;
+    }
 };
 
 const rasterPDF = async page => {
