@@ -1,4 +1,4 @@
-FROM alpine
+FROM node:22-alpine3.22
 MAINTAINER Dan Florian <hello@danutflorian.com>
 
 RUN apk add freetype \
@@ -10,9 +10,7 @@ RUN apk add freetype \
     ttf-freefont \
     ttf-liberation \
     chromium \
-    ca-certificates \
-    nodejs \
-    npm
+    ca-certificates
 
 RUN mkdir /app
 RUN mkdir /converted
@@ -27,8 +25,11 @@ COPY bin bin
 COPY src src
 COPY entrypoint.sh .
 COPY package.json .
+COPY package-lock.json .
 
-RUN npm i --omit=dev
+ENV PUPPETEER_SKIP_DOWNLOAD=true
+
+RUN npm ci --omit=dev
 
 RUN chmod +x bin/htmlconverter
 RUN chmod +x entrypoint.sh
