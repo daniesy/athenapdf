@@ -30,6 +30,9 @@ func Execute(c []string, terminate <-chan struct{}) ([]byte, error) {
 		var stderr bytes.Buffer
 		cmd.Stderr = &stderr
 		out, err := cmd.Output()
+		// Whatever the command left behind in its group (a browser that outlived
+		// its CLI) goes with it.
+		killGroup(cmd)
 		if err != nil {
 			cerr <- fmt.Errorf("%+v : %+v", err, stderr.String())
 			return
@@ -46,12 +49,25 @@ func Execute(c []string, terminate <-chan struct{}) ([]byte, error) {
 		return nil, err
 	case <-terminate:
 		log.Println("exiting")
-		// if (cmd.ProcessState == nil || cmd.ProcessState.Exited() == false) && cmd.Process != nil {
-		if cmd.Process != nil {
-			if err := cmd.Process.Kill(); err != nil {
-				return nil, err
-			}
+		if err := killGroup(cmd); err != nil {
+			return nil, err
 		}
 		return nil, ErrCmdTerminated
 	}
+}
+
+// killGroup kills the command's whole process group. The converter command is
+// a wrapper that spawns node, which spawns Chromium: killing only the wrapper
+// (cmd.Process.Kill) left node and Chromium running for good — 11 abandoned
+// conversions were still holding CPU and memory 214 days later (2026-11-25).
+// Setpgid made the wrapper the leader of its own group, so -pid reaches every
+// process it started. A group that is already gone is not an error.
+func killGroup(cmd *exec.Cmd) error {
+	if cmd.Process == nil {
+		return nil
+	}
+	if err := syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL); err != nil && err != syscall.ESRCH {
+		return err
+	}
+	return nil
 }
